@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, FormEvent } from 'react';
@@ -367,14 +366,65 @@ export default function AdminPage() {
               <div className="space-y-4 mt-6 border-t pt-6">
                 <div className="flex justify-between items-center">
                   <Label className="text-lg font-medium">Additional Images</Label>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setAdditionalImages([...additionalImages, {src: '', alt: ''}])}
-                  >
-                    Add Image
-                  </Button>
+                  <div className="flex gap-2">
+                    <div className="relative">
+                      <Input 
+                        id="multipleImageUpload"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length > 0) {
+                            files.forEach(file => {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                if (event.target?.result) {
+                                  const img = new Image();
+                                  img.onload = () => {
+                                    const canvas = document.createElement('canvas');
+                                    const ctx = canvas.getContext('2d');
+                                    
+                                    // Calculate new dimensions (max width 800px for thumbnails)
+                                    const maxWidth = 800;
+                                    const ratio = maxWidth / img.width;
+                                    const width = maxWidth;
+                                    const height = img.height * ratio;
+                                    
+                                    canvas.width = width;
+                                    canvas.height = height;
+                                    
+                                    // Draw and compress
+                                    ctx?.drawImage(img, 0, 0, width, height);
+                                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                    
+                                    setAdditionalImages(prev => [...prev, {
+                                      src: compressedDataUrl,
+                                      alt: file.name.replace(/\.[^/.]+$/, "") // Use filename as alt text initially
+                                    }]);
+                                  };
+                                  img.src = event.target.result.toString();
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            });
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" size="sm" className="whitespace-nowrap">
+                        Upload Multiple Images
+                      </Button>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setAdditionalImages([...additionalImages, {src: '', alt: ''}])}
+                    >
+                      Add URL Image
+                    </Button>
+                  </div>
                 </div>
                 
                 {additionalImages.length > 0 ? (
