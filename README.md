@@ -4,7 +4,7 @@ A modern, responsive website built with Next.js for showcasing premium marble an
 
 ## 🌐 Live Demo
 
-Visit our website: [Marble Stonex](https://your-netlify-link-here.netlify.app)
+Visit our website: [Marble Stonex](https://mahaveerstonex.netlify.app/)
 
 
 ## 🚀 Features
@@ -95,9 +95,6 @@ src/
 - **Admin Dashboard**: Manage products and content
 - **Image Modal**: Detailed view of product images
 
-## 🌐 Deployment
-
-This website can be deployed on [Vercel](https://vercel.com/) or any other hosting platform that supports Next.js applications.
 
 ## 📄 License
 
