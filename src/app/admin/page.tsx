@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Edit3, LogIn, LogOut } from 'lucide-react';
+import { uploadImageToSupabase, dataUrlToFile } from '@/lib/supabase';
 
 const PRODUCTS_KEY = 'siteProducts';
 const ADMIN_AUTH_KEY = 'isAdminAuthenticated_v2'; // Changed key to avoid conflicts if old one exists
@@ -163,52 +164,60 @@ export default function AdminPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSubmitProduct = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!title || !description || !category) {
-      toast({ title: "Missing Fields", description: "Title, description, and category are required.", variant: "destructive" });
-      return;
-    }
-
-    const finalImageSrc = imageSrc || `https://placehold.co/600x400.png`;
-    const finalImageAlt = imageAlt || title;
-    const finalAiHint = aiHint || category.toLowerCase().replace(/\s+/g, ' ').substring(0,30) || 'stone product';
-
-    const productData: Omit<ProductItem, 'id' | 'dateAdded'> = {
-      title,
-      description,
-      imageSrc: finalImageSrc,
-      imageAlt: finalImageAlt,
-      additionalImages,
-      aiHint: finalAiHint,
-      category,
-      isTopSelling,
-      specifications: {
-        color: specColor,
-        finish: specFinish,
-        origin: specOrigin,
-        thickness: specThickness,
+  const handleImageUpload = async (file: File, isMainImage: boolean = false) => {
+    try {
+      const timestamp = Date.now();
+      const url = await uploadImageToSupabase(file, `products/${timestamp}`);
+      
+      if (isMainImage) {
+        setImageSrc(url);
+      } else {
+        setAdditionalImages(prev => [...prev, { src: url, alt: file.name.replace(/\.[^/.]+$/, "") }]);
       }
-    };
-
-    if (editingProduct) {
-      const updatedProduct: ProductItem = { 
-        ...editingProduct, 
-        ...productData,
-      };
-      const updatedProducts = products.map(p => (p.id === editingProduct.id ? updatedProduct : p));
-      saveProductsToLocalStorage(updatedProducts);
-      toast({ title: "Product Updated", description: `"${title}" has been updated.` });
-    } else {
-      const newProduct: ProductItem = {
-        id: Date.now().toString(), 
-        ...productData,
-        dateAdded: new Date().toISOString(),
-      };
-      saveProductsToLocalStorage([newProduct, ...products]);
-      toast({ title: "Product Added", description: `"${title}" has been added.` });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({ title: "Error", description: "Failed to upload image.", variant: "destructive" });
     }
-    resetForm();
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) return;
+
+    try {
+      const newProduct: ProductItem = {
+        id: editingProduct?.id || Date.now().toString(),
+        title,
+        description,
+        imageSrc,
+        imageAlt: imageAlt || title,
+        aiHint,
+        category,
+        isTopSelling,
+        specifications: {
+          color: specColor,
+          finish: specFinish,
+          origin: specOrigin,
+          thickness: specThickness
+        },
+        additionalImages,
+        dateAdded: editingProduct?.dateAdded || new Date().toISOString()
+      };
+
+      const updatedProducts = editingProduct
+        ? products.map(p => p.id === editingProduct.id ? newProduct : p)
+        : [...products, newProduct];
+
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(updatedProducts));
+      setProducts(updatedProducts);
+      
+      resetForm();
+      setIsFormVisible(false);
+      toast({ title: `Product ${editingProduct ? 'Updated' : 'Added'}`, description: "Changes saved successfully." });
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast({ title: "Error", description: "Failed to save product.", variant: "destructive" });
+    }
   };
 
   const handleDelete = (productId: string, productTitle: string) => {
@@ -286,7 +295,7 @@ export default function AdminPage() {
             <CardTitle className="text-xl">{editingProduct ? 'Edit Product' : 'Add New Product'}</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmitProduct} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="title">Product Title</Label>
@@ -374,41 +383,12 @@ export default function AdminPage() {
                         accept="image/*"
                         multiple
                         className="absolute inset-0 opacity-0 cursor-pointer"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const files = Array.from(e.target.files || []);
                           if (files.length > 0) {
-                            files.forEach(file => {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                if (event.target?.result) {
-                                  const img = new Image();
-                                  img.onload = () => {
-                                    const canvas = document.createElement('canvas');
-                                    const ctx = canvas.getContext('2d');
-                                    
-                                    // Calculate new dimensions (max width 800px for thumbnails)
-                                    const maxWidth = 800;
-                                    const ratio = maxWidth / img.width;
-                                    const width = maxWidth;
-                                    const height = img.height * ratio;
-                                    
-                                    canvas.width = width;
-                                    canvas.height = height;
-                                    
-                                    // Draw and compress
-                                    ctx?.drawImage(img, 0, 0, width, height);
-                                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                                    
-                                    setAdditionalImages(prev => [...prev, {
-                                      src: compressedDataUrl,
-                                      alt: file.name.replace(/\.[^/.]+$/, "") // Use filename as alt text initially
-                                    }]);
-                                  };
-                                  img.src = event.target.result.toString();
-                                }
-                              };
-                              reader.readAsDataURL(file);
-                            });
+                            for (const file of files) {
+                              await handleImageUpload(file);
+                            }
                           }
                         }}
                       />
@@ -416,14 +396,6 @@ export default function AdminPage() {
                         Upload Multiple Images
                       </Button>
                     </div>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setAdditionalImages([...additionalImages, {src: '', alt: ''}])}
-                    >
-                      Add URL Image
-                    </Button>
                   </div>
                 </div>
                 

@@ -1,0 +1,10 @@
+# Netlify settings for single-page application
+/*    /index.html   200
+
+# Redirects from what the browser requests to what we serve
+/home              /
+/about            /about
+/admin            /admin
+/contact          /contact
+/stone-types      /stone-types
+/details          /details
