@@ -12,7 +12,7 @@ export default function AboutPage() {
         
         <div className="relative w-full h-80 rounded-lg overflow-hidden shadow-xl mb-12">
           <Image 
-            src="https://placehold.co/1200x400.png" 
+            src="/images/logo_bigger.jpg" 
             alt="Stone Elegance Showroom" 
             data-ai-hint="showroom interior design"
             fill
